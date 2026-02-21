@@ -1,0 +1,227 @@
+import User from '../models/User.js'
+import Order from '../models/Order.js'
+import jwt from 'jsonwebtoken'
+import { sendSuccess, sendError, catchAsync } from '../utils/errorHandler.js'
+
+// Register user
+export const register = catchAsync(async (req, res) => {
+  const { firstName, lastName, email, phone, password, passwordConfirm } = req.body
+  
+  // Validation
+  if (!firstName || !lastName || !email || !phone || !password) {
+    return sendError(res, 'All fields are required', 400)
+  }
+  
+  if (password.length < 6) {
+    return sendError(res, 'Password must be at least 6 characters', 400)
+  }
+  
+  if (password !== passwordConfirm) {
+    return sendError(res, 'Passwords do not match', 400)
+  }
+  
+  // Check if user already exists
+  const existingUser = await User.findOne({ email })
+  if (existingUser) {
+    return sendError(res, 'Email already registered', 400)
+  }
+  
+  // Create user
+  const user = await User.create({
+    firstName,
+    lastName,
+    email,
+    phone,
+    password
+  })
+  
+  // Generate JWT token
+  const token = jwt.sign(
+    { 
+      userId: user._id,
+      email: user.email,
+      role: 'customer'
+    },
+    process.env.JWT_SECRET || 'jwt_secret',
+    { expiresIn: '30d' }
+  )
+  
+  // Remove password from response
+  user.password = undefined
+  
+  sendSuccess(res, { 
+    token, 
+    user: {
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phone: user.phone
+    }
+  }, 201, 'Registration successful')
+})
+
+// Login user
+export const login = catchAsync(async (req, res) => {
+  const { email, password } = req.body
+  
+  if (!email || !password) {
+    return sendError(res, 'Email and password are required', 400)
+  }
+  
+  // Find user and include password field
+  const user = await User.findOne({ email }).select('+password')
+  
+  if (!user) {
+    return sendError(res, 'Invalid email or password', 401)
+  }
+  
+  // Check password
+  const isPasswordValid = await user.comparePassword(password)
+  
+  if (!isPasswordValid) {
+    return sendError(res, 'Invalid email or password', 401)
+  }
+  
+  // Update last login
+  user.lastLogin = new Date()
+  await user.save()
+  
+  // Generate token
+  const token = jwt.sign(
+    { 
+      userId: user._id,
+      email: user.email,
+      role: 'customer'
+    },
+    process.env.JWT_SECRET || 'jwt_secret',
+    { expiresIn: '30d' }
+  )
+  
+  // Remove password from response
+  user.password = undefined
+  
+  sendSuccess(res, {
+    token,
+    user: {
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phone: user.phone
+    }
+  }, 200, 'Login successful')
+})
+
+// Get user profile
+export const getProfile = catchAsync(async (req, res) => {
+  const user = await User.findById(req.user.userId).select('-password')
+  
+  if (!user) {
+    return sendError(res, 'User not found', 404)
+  }
+  
+  sendSuccess(res, user)
+})
+
+// Update user profile
+export const updateProfile = catchAsync(async (req, res) => {
+  const { firstName, lastName, phone } = req.body
+  
+  const user = await User.findByIdAndUpdate(
+    req.user.userId,
+    { firstName, lastName, phone },
+    { new: true, runValidators: true }
+  ).select('-password')
+  
+  if (!user) {
+    return sendError(res, 'User not found', 404)
+  }
+  
+  sendSuccess(res, user, 200, 'Profile updated successfully')
+})
+
+// Change password
+export const changePassword = catchAsync(async (req, res) => {
+  const { currentPassword, newPassword, confirmPassword } = req.body
+  
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    return sendError(res, 'All password fields are required', 400)
+  }
+  
+  if (newPassword.length < 6) {
+    return sendError(res, 'New password must be at least 6 characters', 400)
+  }
+  
+  if (newPassword !== confirmPassword) {
+    return sendError(res, 'Passwords do not match', 400)
+  }
+  
+  // Get user with password field
+  const user = await User.findById(req.user.userId).select('+password')
+  
+  if (!user) {
+    return sendError(res, 'User not found', 404)
+  }
+  
+  // Verify current password
+  const isPasswordValid = await user.comparePassword(currentPassword)
+  
+  if (!isPasswordValid) {
+    return sendError(res, 'Current password is incorrect', 401)
+  }
+  
+  // Update password
+  user.password = newPassword
+  await user.save()
+  
+  sendSuccess(res, null, 200, 'Password changed successfully')
+})
+
+// Add address
+export const addAddress = catchAsync(async (req, res) => {
+  const { street, city, state, zipCode, phone, isDefault } = req.body
+  
+  const user = await User.findByIdAndUpdate(
+    req.user.userId,
+    {
+      $push: {
+        addresses: {
+          street,
+          city,
+          state,
+          zipCode,
+          phone,
+          isDefault: isDefault || false
+        }
+      }
+    },
+    { new: true }
+  ).select('-password')
+  
+  sendSuccess(res, user, 201, 'Address added successfully')
+})
+
+// Delete address
+export const deleteAddress = catchAsync(async (req, res) => {
+  const { addressIndex } = req.params
+  
+  const user = await User.findById(req.user.userId)
+  
+  if (!user) {
+    return sendError(res, 'User not found', 404)
+  }
+  
+  user.addresses.splice(parseInt(addressIndex), 1)
+  await user.save()
+  
+  sendSuccess(res, user, 200, 'Address deleted successfully')
+})
+
+// Get user's order history
+export const getOrderHistory = catchAsync(async (req, res) => {
+  const orders = await Order.find({ 'customer.email': req.user.email })
+    .sort({ createdAt: -1 })
+  
+  sendSuccess(res, orders)
+})

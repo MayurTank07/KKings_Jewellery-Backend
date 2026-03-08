@@ -12,8 +12,9 @@ export const register = catchAsync(async (req, res) => {
     return sendError(res, 'All fields are required', 400)
   }
   
-  if (password.length < 6) {
-    return sendError(res, 'Password must be at least 6 characters', 400)
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/
+  if (!passwordRegex.test(password)) {
+    return sendError(res, 'Password must be at least 8 characters and include uppercase, lowercase, and a number', 400)
   }
   
   if (password !== passwordConfirm) {
@@ -42,8 +43,8 @@ export const register = catchAsync(async (req, res) => {
       email: user.email,
       role: 'customer'
     },
-    process.env.JWT_SECRET || 'jwt_secret',
-    { expiresIn: '30d' }
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   )
   
   // Remove password from response
@@ -94,8 +95,8 @@ export const login = catchAsync(async (req, res) => {
       email: user.email,
       role: 'customer'
     },
-    process.env.JWT_SECRET || 'jwt_secret',
-    { expiresIn: '30d' }
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   )
   
   // Remove password from response
@@ -149,8 +150,9 @@ export const changePassword = catchAsync(async (req, res) => {
     return sendError(res, 'All password fields are required', 400)
   }
   
-  if (newPassword.length < 6) {
-    return sendError(res, 'New password must be at least 6 characters', 400)
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/
+  if (!passwordRegex.test(newPassword)) {
+    return sendError(res, 'Password must be at least 8 characters and include uppercase, lowercase, and a number', 400)
   }
   
   if (newPassword !== confirmPassword) {
@@ -224,4 +226,12 @@ export const getOrderHistory = catchAsync(async (req, res) => {
     .sort({ createdAt: -1 })
   
   sendSuccess(res, orders)
+})
+
+// Admin: Get all customers
+export const getAllCustomers = catchAsync(async (req, res) => {
+  const customers = await User.find({})
+    .select('-password')
+    .sort({ createdAt: -1 })
+  sendSuccess(res, customers)
 })

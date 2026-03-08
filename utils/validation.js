@@ -22,10 +22,7 @@ export const validateProduct = (product) => {
   if (!product.category || product.category.trim().length === 0) {
     errors.push('Product category is required')
   }
-  if (!product.images || !Array.isArray(product.images) || product.images.length === 0) {
-    errors.push('At least one product image is required')
-  }
-  if (product.images && product.images.length > 4) {
+  if (product.images && (!Array.isArray(product.images) || product.images.length > 4)) {
     errors.push('Product can have maximum 4 images')
   }
   

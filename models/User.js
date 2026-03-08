@@ -83,4 +83,6 @@ userSchema.methods.comparePassword = async function(passwordToCheck) {
   return await bcryptjs.compare(passwordToCheck, this.password)
 }
 
+userSchema.index({ isActive: 1 })
+
 export default mongoose.model('User', userSchema)

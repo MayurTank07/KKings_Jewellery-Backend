@@ -1,6 +1,28 @@
 import Product from '../models/Product.js'
+import cloudinary from 'cloudinary'
 import { sendSuccess, sendError, catchAsync } from '../utils/errorHandler.js'
 import { validateProduct } from '../utils/validation.js'
+
+const extractPublicId = (url) => {
+  if (!url || !url.includes('cloudinary')) return null
+  const parts = url.split('/')
+  const fileWithExt = parts[parts.length - 1]
+  const file = fileWithExt.split('.')[0]
+  const folder = parts[parts.length - 2]
+  return `${folder}/${file}`
+}
+
+const deleteCloudinaryImages = async (images = []) => {
+  for (const url of images) {
+    const publicId = extractPublicId(url)
+    if (publicId) {
+      try {
+        await cloudinary.v2.uploader.destroy(publicId)
+      } catch (e) {
+      }
+    }
+  }
+}
 
 // GET all products with filters
 export const getProducts = catchAsync(async (req, res) => {
@@ -66,7 +88,7 @@ export const getProductsByCategory = catchAsync(async (req, res) => {
 
 // CREATE product
 export const createProduct = catchAsync(async (req, res) => {
-  const { name, description, price, selling_price, category, images, stock, sku } = req.body
+  const { name, description, price, selling_price, category, brand, images, stock, sku } = req.body
   
   // Validate input
   const validation = validateProduct({ name, description, price, category, images })
@@ -88,6 +110,7 @@ export const createProduct = catchAsync(async (req, res) => {
     price,
     selling_price,
     category,
+    brand: brand || null,
     images: images || [],
     stock: stock || 1,
     sku
@@ -102,6 +125,15 @@ export const createProduct = catchAsync(async (req, res) => {
 export const updateProduct = catchAsync(async (req, res) => {
   const { id } = req.params
   const updates = req.body
+
+  // Cloudinary: delete removed images
+  if (updates.images) {
+    const existing = await Product.findById(id)
+    if (existing && existing.images) {
+      const removedImages = existing.images.filter(img => !updates.images.includes(img))
+      await deleteCloudinaryImages(removedImages)
+    }
+  }
   
   // Validate product data if provided
   if (updates.name || updates.description || updates.price || updates.category || updates.images) {
@@ -140,13 +172,14 @@ export const updateProduct = catchAsync(async (req, res) => {
 // DELETE product
 export const deleteProduct = catchAsync(async (req, res) => {
   const { id } = req.params
-  
-  const product = await Product.findByIdAndDelete(id)
-  
-  if (!product) {
-    return sendError(res, 'Product not found', 404)
-  }
-  
+
+  const product = await Product.findById(id)
+  if (!product) return sendError(res, 'Product not found', 404)
+
+  // Delete all product images from Cloudinary
+  await deleteCloudinaryImages(product.images || [])
+
+  await Product.findByIdAndDelete(id)
   sendSuccess(res, null, 200, 'Product deleted successfully')
 })
 

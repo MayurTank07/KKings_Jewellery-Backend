@@ -88,4 +88,20 @@ router.post('/multiple', protectAdmin, upload.array('images', 4), async (req, re
   }
 })
 
+// Delete image from Cloudinary
+router.delete('/cloudinary', protectAdmin, async (req, res) => {
+  try {
+    const { publicId } = req.body
+    if (!publicId) return sendError(res, 'publicId is required', 400)
+
+    const result = await cloudinary.v2.uploader.destroy(publicId)
+    if (result.result === 'ok' || result.result === 'not found') {
+      return sendSuccess(res, { result }, 200, 'Image deleted from Cloudinary')
+    }
+    return sendError(res, 'Failed to delete image', 500)
+  } catch (error) {
+    sendError(res, error.message || 'Delete failed', 500)
+  }
+})
+
 export default router

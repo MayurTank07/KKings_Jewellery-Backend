@@ -5,50 +5,33 @@ import { sendSuccess, sendError, catchAsync } from '../utils/errorHandler.js'
 export const getContent = catchAsync(async (req, res) => {
   const { type } = req.params
   
-  const validTypes = ['home', 'our-story', 'footer', 'page']
-  if (!validTypes.includes(type)) {
-    return sendError(res, `Invalid content type. Must be one of: ${validTypes.join(', ')}`, 400)
-  }
-  
   const content = await Content.findOne({ type })
   
   if (!content) {
-    // Return default empty structure
-    return sendSuccess(res, { type, content: null, data: {} })
+    return sendSuccess(res, { type, data: null })
   }
   
-  sendSuccess(res, content)
+  sendSuccess(res, { type, data: content.data || null })
 })
 
-// UPDATE or CREATE content
+// UPDATE or CREATE content (saves entire req.body as doc.data)
 export const saveContent = catchAsync(async (req, res) => {
   const { type } = req.params
-  const { content, data, metadata } = req.body
+  const payload = req.body
   
-  const validTypes = ['home', 'our-story', 'footer', 'page']
-  if (!validTypes.includes(type)) {
-    return sendError(res, `Invalid content type. Must be one of: ${validTypes.join(', ')}`, 400)
-  }
+  if (!type) return sendError(res, 'Content type is required', 400)
   
   let doc = await Content.findOne({ type })
   
   if (!doc) {
-    doc = new Content({
-      type,
-      content,
-      data,
-      metadata,
-      isPublished: true
-    })
+    doc = new Content({ type, data: payload, isPublished: true })
   } else {
-    doc.content = content
-    doc.data = data
-    doc.metadata = metadata
+    doc.data = payload
   }
   
   await doc.save()
   
-  sendSuccess(res, doc, 200, 'Content updated successfully')
+  sendSuccess(res, { type, data: doc.data }, 200, 'Content saved successfully')
 })
 
 // GET all content pages

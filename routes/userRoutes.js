@@ -10,12 +10,14 @@ import {
   getOrderHistory
 } from '../controllers/userController.js'
 import { protectCustomer } from '../middleware/customerAuth.js'
+import { loginRateLimiter } from '../middleware/authMiddleware.js'
+import { validateRegister, validateLogin } from '../middleware/validateRequest.js'
 
 const router = express.Router()
 
 // Public routes
-router.post('/register', register)
-router.post('/login', login)
+router.post('/register', loginRateLimiter, validateRegister, register)
+router.post('/login', loginRateLimiter, validateLogin, login)
 
 // Protected routes (require authentication)
 router.get('/profile', protectCustomer, getProfile)

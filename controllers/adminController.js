@@ -1,8 +1,6 @@
 import jwt from 'jsonwebtoken'
+import bcryptjs from 'bcryptjs'
 import { sendSuccess, sendError, catchAsync } from '../utils/errorHandler.js'
-
-// 🔐 Admin password from .env
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123456'
 
 // ======================
 // 🔐 LOGIN ADMIN
@@ -14,9 +12,18 @@ export const loginAdmin = catchAsync(async (req, res) => {
     return sendError(res, 'Password is required', 400)
   }
 
-  // ❌ Wrong password
-  if (password !== ADMIN_PASSWORD) {
-    console.log('❌ Admin login failed')
+  // Compare password - supports both bcrypt hash and plain text
+  const storedPassword = process.env.ADMIN_PASSWORD
+  if (!storedPassword) {
+    return sendError(res, 'Admin not configured', 500)
+  }
+
+  const isMatch = storedPassword.startsWith('$2')
+    ? await bcryptjs.compare(password, storedPassword)
+    : password === storedPassword
+
+  if (!isMatch) {
+    console.log('❌ Admin login failed - invalid password')
     return sendError(res, 'Invalid password', 401)
   }
 
@@ -26,8 +33,8 @@ export const loginAdmin = catchAsync(async (req, res) => {
       role: 'admin',
       loginTime: Date.now()
     },
-    process.env.JWT_SECRET || 'jwt_secret',
-    { expiresIn: '7d' }
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   )
 
   console.log('✅ Admin login success')

@@ -1,13 +1,23 @@
 import jwt from 'jsonwebtoken'
 import rateLimit from 'express-rate-limit'
-// Rate limiter middleware
+
+// General rate limiter middleware
 export const createRateLimiter = () =>
   rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: process.env.NODE_ENV === 'production' ? 100 : 1000, // Higher limit for development
     standardHeaders: true,
     legacyHeaders: false,
   })
+
+// Strict login rate limiter: 10 attempts per 15 minutes per IP
+export const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many login attempts. Please try again in 15 minutes.' }
+})
 
 export const protectAdmin = (req, res, next) => {
   try {
@@ -39,3 +49,6 @@ export const protectAdmin = (req, res, next) => {
     })
   }
 }
+
+// Alias for consistency with route imports
+export const authenticateAdmin = protectAdmin

@@ -1,5 +1,32 @@
 import mongoose from 'mongoose'
 
+const reviewSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  userName: {
+    type: String,
+    required: true
+  },
+  rating: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 5
+  },
+  comment: {
+    type: String,
+    trim: true,
+    maxlength: 500
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+})
+
 const productSchema = new mongoose.Schema(
   {
     name: {
@@ -27,13 +54,18 @@ const productSchema = new mongoose.Schema(
       required: [true, 'Category is required'],
       trim: true
     },
+    brand: {
+      type: String,
+      trim: true,
+      default: null
+    },
     images: {
       type: [String],
       validate: {
         validator: function(arr) {
-          return arr.length >= 1 && arr.length <= 4
+          return arr.length <= 4
         },
-        message: 'Product must have between 1 and 4 images'
+        message: 'Product can have at most 4 images'
       },
       default: []
     },
@@ -42,6 +74,36 @@ const productSchema = new mongoose.Schema(
       required: true,
       default: 1,
       min: [0, 'Stock cannot be negative']
+    },
+    sizes: [{
+      size: {
+        type: String,
+        required: true
+      },
+      stock: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0
+      }
+    }],
+    hasSizes: {
+      type: Boolean,
+      default: false
+    },
+    material: {
+      type: String,
+      enum: ['Gold', 'Silver', 'Platinum', 'Brass', 'Other'],
+      default: 'Gold'
+    },
+    purity: {
+      type: String,
+      default: null
+    },
+    weight: {
+      type: Number,
+      min: 0,
+      default: null
     },
     sku: {
       type: String,
@@ -52,12 +114,27 @@ const productSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true
+    },
+    reviews: [reviewSchema],
+    averageRating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5
+    },
+    totalReviews: {
+      type: Number,
+      default: 0
     }
   },
   { timestamps: true }
 )
 
-// Create text index for search
+// Text index for full-text search
 productSchema.index({ name: 'text', description: 'text', category: 'text' })
+// Compound index for category-based sorted queries
+productSchema.index({ category: 1, createdAt: -1 })
+// Active product filtering
+productSchema.index({ isActive: 1, createdAt: -1 })
 
 export default mongoose.model('Product', productSchema)

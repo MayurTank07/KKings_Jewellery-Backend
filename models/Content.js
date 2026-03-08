@@ -4,8 +4,8 @@ const contentSchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ['home', 'our-story', 'footer', 'page'],
-      required: true
+      required: true,
+      trim: true
     },
     pageKey: {
       type: String,

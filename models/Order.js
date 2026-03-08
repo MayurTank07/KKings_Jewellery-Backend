@@ -1,18 +1,49 @@
 import mongoose from 'mongoose'
 
+const orderItemSchema = new mongoose.Schema({
+  productId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
+    required: true
+  },
+  name: {
+    type: String,
+    required: true
+  },
+  price: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1
+  },
+  selectedSize: {
+    type: String,
+    default: null
+  },
+  image: {
+    type: String,
+    default: null
+  },
+  subtotal: {
+    type: Number,
+    required: true,
+    min: 0
+  }
+})
+
 const orderSchema = new mongoose.Schema(
   {
-    items: [
-      {
-        id: String,
-        name: String,
-        price: Number,
-        quantity: Number,
-        selectedSize: String,
-        image: String
-      }
-    ],
-    customer: {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    items: [orderItemSchema],
+    shippingAddress: {
       firstName: {
         type: String,
         required: true
@@ -21,10 +52,15 @@ const orderSchema = new mongoose.Schema(
         type: String,
         required: true
       },
-      email: String,
+      email: {
+        type: String,
+        required: true,
+        match: /.+@.+\..+/
+      },
       mobile: {
         type: String,
-        required: true
+        required: true,
+        match: /^[0-9]{10}$/
       },
       streetAddress: {
         type: String,
@@ -34,35 +70,104 @@ const orderSchema = new mongoose.Schema(
         type: String,
         required: true
       },
-      state: String,
-      zipCode: {
+      state: {
         type: String,
         required: true
+      },
+      zipCode: {
+        type: String,
+        required: true,
+        match: /^[0-9]{6}$/
       }
     },
-    total: {
+    subtotal: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    tax: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    shippingCost: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    discount: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    couponCode: {
+      type: String,
+      default: null
+    },
+    totalAmount: {
       type: Number,
       required: true,
       min: 0
     },
     status: {
       type: String,
-      enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+      enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
       default: 'pending'
     },
     paymentStatus: {
       type: String,
-      enum: ['pending', 'paid', 'failed'],
+      enum: ['pending', 'paid', 'failed', 'refunded'],
       default: 'pending'
+    },
+    paymentMethod: {
+      type: String,
+      enum: ['cod', 'razorpay', 'upi', 'card'],
+      default: 'cod'
     },
     paymentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Payment'
+      ref: 'Payment',
+      default: null
     },
-    notes: String,
-    trackingNumber: String
+    razorpayOrderId: {
+      type: String,
+      default: null
+    },
+    razorpayPaymentId: {
+      type: String,
+      default: null
+    },
+    notes: {
+      type: String,
+      trim: true,
+      maxlength: 500
+    },
+    trackingNumber: {
+      type: String,
+      default: null
+    },
+    estimatedDelivery: {
+      type: Date,
+      default: null
+    },
+    deliveredAt: {
+      type: Date,
+      default: null
+    },
+    cancelledAt: {
+      type: Date,
+      default: null
+    },
+    cancellationReason: {
+      type: String,
+      default: null
+    }
   },
   { timestamps: true }
 )
+
+orderSchema.index({ 'customer.email': 1 })
+orderSchema.index({ status: 1, createdAt: -1 })
+orderSchema.index({ createdAt: -1 })
 
 export default mongoose.model('Order', orderSchema)
